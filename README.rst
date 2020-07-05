@@ -11,5 +11,26 @@ All the code examples assume::
 
    >>> from ya.resourcepool import *
 
+Simple use case:
+================
+
+   >>> class R:
+   >>>     def use(self)
+   >>>         pass
+   >>> pool = ResourcePool(R)
+   >>> with pool.get() as obj:
+   >>>     obj.use()
+
 Points of variability
 =====================
+
+The ``ResourcePool`` class is highly configurable through multiple points of variability:
+
+- resource allocation policy
+- resource deallocation method
+- retention policy
+
+
+Resource allocation policy
+--------------------------
+
