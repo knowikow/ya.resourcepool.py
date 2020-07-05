@@ -7,5 +7,9 @@ Yet Another Resource Pool
 
 A configurable resource pool.
 
+All the code examples assume::
+
+   >>> from ya.resourcepool import *
+
 Points of variability
 =====================
