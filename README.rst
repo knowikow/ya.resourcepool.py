@@ -1,7 +1,9 @@
-.. image:: https://github.com/knowikow/ya.objectpool.py/workflows/build/badge.svg
-   :target: https://github.com/knowikow/ya.objectpool.py/workflows/build/badge.svg
+.. image:: https://github.com/knowikow/ya.resourcepool.py/workflows/build/badge.svg
+   :target: https://github.com/knowikow/ya.resourcepool.py/workflows/build/badge.svg
 
-======================
-Yet Another Objectpool
-======================
+=========================
+Yet Another Resource Pool
+=========================
+
+A configurable resource pool.
 
