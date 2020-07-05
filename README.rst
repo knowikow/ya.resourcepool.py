@@ -7,3 +7,5 @@ Yet Another Resource Pool
 
 A configurable resource pool.
 
+Points of variability
+=====================
