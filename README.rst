@@ -87,7 +87,7 @@ When using one of the allocation policies ``fixed`` or ``dynamic (limited)``, th
 
 This can be changed with the allocation failure policy:
 
-- ``exception``: Raises an exception of type ``ResourcePoolExhausted``
+- ``raising``: Raises an exception of type ``ResourcePoolExhausted``
 - ``blocking``: This blocks an internal ``threading.Condition`` object that will be notified when a resource becomes available. This policy takes an optional timeout after which a ``ResourcePoolExhausted`` exception will be raised::
 
    >>> pool = ResourcePool([], blocking)
