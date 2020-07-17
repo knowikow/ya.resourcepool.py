@@ -1,3 +1,4 @@
+"""Setup script for ya.resourcepool."""
 import setuptools
 
 setuptools.setup()
