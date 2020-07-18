@@ -17,7 +17,8 @@ R = TypeVar('R')
 
 class ResourcePool(Generic[R]):
     """The resource pool."""
-    __slots__ = '__pool __alloc __dealloc __lock __cond __gc_cond __min __max'.split()
+    __slots__ = '__pool __alloc __dealloc __lock __cond __gc_cond __min __max'.split(
+    )
 
     def __init__(self: ResourcePool,
                  *,
@@ -26,9 +27,6 @@ class ResourcePool(Generic[R]):
                  init: Iterable = [],
                  size: Union[int, Tuple[int, int]] = None) -> None:
         """Initialize the object."""
-        def identity(arg: Any) -> Any:
-            return arg
-
         def _max_size_exceeded() -> bool:
             return len(self.__pool) > self.__max
 
@@ -48,7 +46,7 @@ class ResourcePool(Generic[R]):
             self.__alloc = self.__wait_blocking
         else:
             self.__alloc = lambda _: alloc()
-        self.__dealloc = dealloc or identity
+        self.__dealloc = dealloc or noop
         self.__pool.extend(
             ResourceWrapper(resource, self.__dealloc) for resource in init)
 
@@ -117,8 +115,6 @@ class ResourcePool(Generic[R]):
 
 class ResourceWrapper(Generic[R]):
     """A wrapper for a resource that is managed by the ResourceWrapper."""
-    __slots__ = 'finalize timestamp'.split()
-
     def __init__(self: ResourceWrapper, resource: R,
                  dealloc: Callable[[R], Any]) -> None:
         """Initialize the object."""
@@ -126,12 +122,12 @@ class ResourceWrapper(Generic[R]):
 
     def pop(self: ResourceWrapper) -> R:
         """Detach and return the wrapped resource."""
-        resource = self.finalize.detach()
-
-        if resource is None:
-            raise DeadResource
-
-        return resource
+        try:
+            _, _, args, _ = self.finalize.detach()
+        except TypeError as ex:
+            raise DeadResource from ex
+        else:
+            return args[0]
 
 
 class DeadResource(Exception):
@@ -140,6 +136,10 @@ class DeadResource(Exception):
 
 class ResourcePoolEmpty(Exception):
     """No more resources available."""
+
+
+def noop(*args: Any, **kwds: Any) -> None:
+    """A function that does nothing at all."""
 
 
 # vim:et sw=4 ts=4
