@@ -47,7 +47,7 @@ class ResourcePool(Generic[R]):
         else:
             self.__alloc = lambda _: alloc()
         self.__dealloc = dealloc or noop
-        self.__pool.extend(
+        self.__pool.extendleft(
             ResourceWrapper(resource, self.__dealloc) for resource in init)
 
         try:
@@ -77,7 +77,7 @@ class ResourcePool(Generic[R]):
         """Return a resource into the pool."""
         wrapper = ResourceWrapper(resource, self.__dealloc)
         with self.__cond:
-            self.__pool.append(wrapper)
+            self.__pool.appendleft(wrapper)
             self.__cond.notify()
         with self.__gc_cond:
             self.__gc_cond.notify()
