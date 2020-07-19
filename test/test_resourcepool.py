@@ -356,7 +356,7 @@ def test_max_size_no_overflow() -> None:
     pool.push(a)
     pool.push(b)
 
-    sleep(3)  # wait for pool's gc thread
+    sleep(1)  # wait for pool's gc thread
     assert len(R.deallocated) == 0
     assert a.alive
     assert b.alive
