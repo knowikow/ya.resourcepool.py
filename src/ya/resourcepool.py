@@ -6,7 +6,7 @@ from collections import deque
 from contextlib import contextmanager, suppress
 from time import monotonic as now
 from typing import (Any, Callable, Generator, Generic, Iterable, Optional,
-                    Tuple, TypeVar, Union)
+                    TypeVar)
 from weakref import finalize
 
 __version__ = '0.0.0'
@@ -17,29 +17,21 @@ R = TypeVar('R')  # pragma: no mutate
 
 class ResourcePool(Generic[R]):
     """The resource pool."""
-    __slots__ = '__pool __alloc __check __dealloc __lock __cond __gc_cond __min __max'.split(
-    )
+    __slots__ = ('__pool', '__alloc', '__check', '__dealloc', '__lock',
+                 '__cond', '__gc_cond', '__min', '__max', '__age')
 
-    def __init__(self: ResourcePool,
-                 *,
-                 alloc: Callable[[], R] = None,
-                 dealloc: Callable[[R], Any] = None,
-                 check: Callable[[R], bool] = None,
-                 init: Iterable = [],
-                 size: Union[int, Tuple[int, int]] = None) -> None:
+    def __init__(
+        self: ResourcePool,
+        *,
+        alloc: Callable[[], R] = None,
+        dealloc: Callable[[R], Any] = None,
+        check: Callable[[R], bool] = None,
+        init: Iterable = [],
+        minsize: Optional[int] = None,
+        maxsize: Optional[int] = None,
+        maxage: Optional[int] = None,
+    ) -> None:
         """Initialize the object."""
-        def _max_size_exceeded() -> bool:
-            return len(self.__pool) > self.__max
-
-        def _gc() -> None:
-            while self.__max is not None:
-                with self.__gc_cond:
-                    self.__gc_cond.wait_for(_max_size_exceeded)
-
-                    with suppress(IndexError):
-                        while len(self.__pool) > self.__min:
-                            self.__pool.pop().finalize()
-
         self.__lock = threading.Lock()
         self.__cond = threading.Condition(self.__lock)
         self.__gc_cond = threading.Condition(self.__lock)
@@ -54,11 +46,13 @@ class ResourcePool(Generic[R]):
             ResourceWrapper(resource, self.__dealloc, self.__check)
             for resource in init)
 
-        try:
-            self.__min, self.__max = size
-        except TypeError:
-            self.__min = self.__max = size
-        threading.Thread(target=_gc, daemon=True).start()
+        if minsize is None:
+            minsize = maxsize
+        self.__min = minsize
+        self.__max = maxsize
+        self.__age = maxage
+
+        threading.Thread(target=self.__gc, daemon=True).start()
 
     def pop(self: ResourcePool, timeout: float = None) -> R:
         """Get a resource from the pool.
@@ -116,6 +110,18 @@ class ResourcePool(Generic[R]):
                     return obj
                 except DeadResource:
                     timeout -= (now() - start)
+
+    def __gc(self: ResourcePool) -> None:
+        def _max_size_exceeded() -> bool:
+            return len(self.__pool) > self.__max
+
+        while self.__max is not None:
+            with self.__gc_cond:
+                self.__gc_cond.wait_for(_max_size_exceeded)
+
+                with suppress(IndexError):
+                    while len(self.__pool) > self.__min:
+                        self.__pool.pop().finalize()
 
 
 class ResourceWrapper(Generic[R]):

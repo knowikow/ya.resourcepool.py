@@ -328,7 +328,7 @@ def test_max_size() -> None:
     Then:
         - the surplus resources will be reset using the dealloc function
     """
-    pool = ResourcePool(alloc=R, dealloc=R.close, size=1)
+    pool = ResourcePool(alloc=R, dealloc=R.close, maxsize=1)
     a, b = pool.pop(), pool.pop()
     pool.push(a)
     pool.push(b)
@@ -351,7 +351,7 @@ def test_max_size_no_overflow() -> None:
     Then:
         - no resources will be reset using the dealloc function
     """
-    pool = ResourcePool(alloc=R, dealloc=R.close, size=(0, 2))
+    pool = ResourcePool(alloc=R, dealloc=R.close, minsize=0, maxsize=2)
     a, b = pool.pop(), pool.pop()
     pool.push(a)
     pool.push(b)
@@ -373,7 +373,7 @@ def test_minmax_size() -> None:
     Then:
         - the surplus resources will be reset using the dealloc function
     """
-    pool = ResourcePool(alloc=R, dealloc=R.close, size=(1, 2))
+    pool = ResourcePool(alloc=R, dealloc=R.close, minsize=1, maxsize=2)
     a, b, c = pool.pop(), pool.pop(), pool.pop()
     pool.push(a)
     pool.push(b)
