@@ -12,18 +12,19 @@ from weakref import finalize
 __version__ = '0.0.0'
 __all__ = 'ResourcePool ResourcePoolEmpty'.split()
 
-R = TypeVar('R')
+R = TypeVar('R')  # pragma: no mutate
 
 
 class ResourcePool(Generic[R]):
     """The resource pool."""
-    __slots__ = '__pool __alloc __dealloc __lock __cond __gc_cond __min __max'.split(
+    __slots__ = '__pool __alloc __check __dealloc __lock __cond __gc_cond __min __max'.split(
     )
 
     def __init__(self: ResourcePool,
                  *,
                  alloc: Callable[[], R] = None,
                  dealloc: Callable[[R], Any] = None,
+                 check: Callable[[R], bool] = None,
                  init: Iterable = [],
                  size: Union[int, Tuple[int, int]] = None) -> None:
         """Initialize the object."""
@@ -32,11 +33,12 @@ class ResourcePool(Generic[R]):
 
         def _gc() -> None:
             while self.__max is not None:
-                self.__gc_cond.wait_for(_max_size_exceeded)
+                with self.__gc_cond:
+                    self.__gc_cond.wait_for(_max_size_exceeded)
 
-                with suppress(IndexError):
-                    while len(self.__pool) > self.__min:
-                        self.__pool.pop().finalize()
+                    with suppress(IndexError):
+                        while len(self.__pool) > self.__min:
+                            self.__pool.pop().finalize()
 
         self.__lock = threading.Lock()
         self.__cond = threading.Condition(self.__lock)
@@ -46,9 +48,11 @@ class ResourcePool(Generic[R]):
             self.__alloc = self.__wait_blocking
         else:
             self.__alloc = lambda _: alloc()
+        self.__check = check or true
         self.__dealloc = dealloc or noop
         self.__pool.extendleft(
-            ResourceWrapper(resource, self.__dealloc) for resource in init)
+            ResourceWrapper(resource, self.__dealloc, self.__check)
+            for resource in init)
 
         try:
             self.__min, self.__max = size
@@ -75,7 +79,7 @@ class ResourcePool(Generic[R]):
 
     def push(self: ResourcePool, resource: R) -> None:
         """Return a resource into the pool."""
-        wrapper = ResourceWrapper(resource, self.__dealloc)
+        wrapper = ResourceWrapper(resource, self.__dealloc, self.__check)
         with self.__cond:
             self.__pool.appendleft(wrapper)
             self.__cond.notify()
@@ -100,25 +104,30 @@ class ResourcePool(Generic[R]):
         elif timeout <= 0:
             timeout = None
 
-        with self.__cond:
-            while True:
-                start = now()
+        while True:
+            start = now()
+            with self.__cond:
                 if not self.__cond.wait_for(_nonempty, timeout=timeout):
                     raise ResourcePoolEmpty
 
                 wrapper = self.__pool.pop()
                 try:
-                    return wrapper.pop()
+                    obj = wrapper.pop()
+                    return obj
                 except DeadResource:
-                    timeout -= now() - start
+                    timeout -= (now() - start)
 
 
 class ResourceWrapper(Generic[R]):
     """A wrapper for a resource that is managed by the ResourceWrapper."""
+    __slots__ = 'check finalize __weakref__'.split()
+
     def __init__(self: ResourceWrapper, resource: R,
-                 dealloc: Callable[[R], Any]) -> None:
+                 dealloc: Callable[[R], Any], check: Callable[[R],
+                                                              bool]) -> None:
         """Initialize the object."""
         self.finalize = finalize(self, dealloc, resource)
+        self.check = check
 
     def pop(self: ResourceWrapper) -> R:
         """Detach and return the wrapped resource."""
@@ -127,7 +136,11 @@ class ResourceWrapper(Generic[R]):
         except TypeError as ex:
             raise DeadResource from ex
         else:
-            return args[0]
+            resource = args[0]
+            if not self.check(resource):
+                raise DeadResource
+
+            return resource
 
 
 class DeadResource(Exception):
@@ -140,6 +153,11 @@ class ResourcePoolEmpty(Exception):
 
 def noop(*args: Any, **kwds: Any) -> None:
     """A function that does nothing at all."""
+
+
+def true(*args: Any, **kwds: Any) -> bool:
+    """A function only returns True."""
+    return True
 
 
 # vim:et sw=4 ts=4

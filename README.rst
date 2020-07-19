@@ -12,14 +12,20 @@ All the code examples assume::
    >>> from ya.resourcepool import *
 
 
-Simple use case:
+Simple use case::
 ================
 
+::
+
    >>> class R:
-   >>>     def use(self)
+   >>>     def __init__(self):
+   >>>         self._alive = True
+   >>>     def use(self):
    >>>         pass
    >>>     def close(self):
-   >>>         pass
+   >>>         self._alive = False
+   >>>     def alive(self):
+   >>>         return self._alive
    >>> pool = ResourcePool(R)
    >>> with pool() as obj:
    >>>     obj.use()
