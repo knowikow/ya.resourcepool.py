@@ -108,7 +108,7 @@ This will raise the exception only after the given timeout of five seconds. Note
 floating point number, so fractions of seconds are possible. A timeout of zero or less will block forever
 or until a resource becomes available.
 
-The `ìnit``argument can be combined with the ``alloc`` argument::
+The ``init`` argument can be combined with the ``alloc`` argument::
 
    >>> resources = [R()]
    >>> pool = ResourcePool(init=resources, alloc=R)
