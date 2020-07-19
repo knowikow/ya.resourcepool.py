@@ -136,7 +136,7 @@ This will call ``R.close()`` when the pool gets garbage collected for all resour
 Resource retention policy
 -------------------------
 
-Surplus resources can be deallocated by giveng the ``maxsize``argument to the pool initializer::
+Surplus resources can be deallocated by giveng the ``maxsize`` argument to the pool initializer::
 
    >>> pool = ResourcePool(alloc=R, maxsize=100)
 
