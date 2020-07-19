@@ -67,13 +67,13 @@ The ``ResourcePool.push()`` method can also be used to add new resource to the p
    >>> obj = R()              # create/allocate a resource
    >>> pool.push(obj)         # push without preceding pop
 
-The ``ResourcePool.__call__()`` method is actually implemented in terms of ``pop``and ``push``.
+The ``ResourcePool.__call__()`` method is actually implemented in terms of ``pop`` and ``push``.
 
 
 Limited resource sets
 ---------------------
 
-If there is only a limited amount of resource instances available, a set can be provided with the `ìnit``argument::
+If there is only a limited amount of resource instances available, a set can be provided with the ``init``argument::
 
    >>> resources = [R()]
    >>> pool = ResourcePool(init=resources)
@@ -160,9 +160,9 @@ can be configured using the ``check`` argument::
    >>>     obj.use()
 
 The object given in ``check`` must be a callable that takes a resource instance and returns a truthy
-value. It will be called for a result value candidate of ``pop``before it is returned, and if the
+value. It will be called for a result value candidate of ``pop`` before it is returned, and if the
 result is convertible to ``False``, then the resource is considered dead and will be discarded
-without calling any ``dealloc``procedure. ``pop``will then continue trying to get a valid resource.
+without calling any ``dealloc`` procedure. ``pop`` will then continue trying to get a valid resource.
 
 
 Future extension plans
@@ -189,4 +189,4 @@ It is possible to block a thread indefinitely by having an empty fixed-size pool
    >>> with pool(timeout=10) as obj:
    >>>     obj.use()
    
-   This code would block forever without the ``Timer`` thread that adds a new object to the pool after 60 seconds.
+This code would block forever without the ``Timer`` thread that adds a new object to the pool after 60 seconds.
