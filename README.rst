@@ -70,8 +70,8 @@ The ``ResourcePool.push()`` method can also be used to add new resource to the p
 The ``ResourcePool.__call__()`` method is actually implemented in terms of ``pop``and ``push``.
 
 
-Limited resource set
---------------------
+Limited resource sets
+---------------------
 
 If there is only a limited amount of resource instances available, a set can be provided with the `ìnit``argument::
 
@@ -95,7 +95,7 @@ if there is no free resource available at the moment::
 Alternatively, a timeout in seconds can be given::
 
    >>> resources = [R()]
-   >>> pool = ResourcePool([])  # empty list
+   >>> pool = ResourcePool()  # an empty list is actually the default for init
    >>> with pool(timeout=10) as obj:
    >>>     obj.use()
    Traceback (most recent call last):
@@ -114,3 +114,79 @@ The `ìnit``argument can be combined with the ``alloc`` argument::
    >>>     obj.use()
 
 This will use the initial resource list and only allocate new ones if the initial resources are exhausted.
+
+
+Resource deallocation
+---------------------
+
+Resources will usually have to be deallocated at some point. The function to do this can be
+given with the ``dealloc`` initializer argument::
+
+   >>> pool = ResourcePool(alloc=R, dealloc=R.close)
+   >>> with pool() as obj:
+   >>>     obj.use()
+
+This will call ``R.close()`` when the pool gets garbage collected for all resources currently managed by the pool.
+
+
+Resource retention policy
+-------------------------
+
+Surplus resources can be deallocated by giveng the ``maxsize``argument to the pool initializer::
+
+   >>> pool = ResourcePool(alloc=R, maxsize=100)
+
+When a ``maxsize`` argument was given, and the pool size exceeds that number after returning a
+resource to the pool, all the surplus will be deallocated. This process will also use the optional ``dealloc``
+argument, or will just remove it from the pool and have it garbage collected.
+
+There is an additional argument ``minsize`` to control the amount of resources that will be deallocated
+in the overflow case::
+
+   >>> pool = ResourcePool(alloc=R, maxsize=100, minsize=50)
+
+This will reduce the pool size to 50 by deallocating surplus resources when the size exceeds 100 after
+a ``push`` operation.
+
+
+Resource alive check
+--------------------
+
+It is possible to check the status of any pooled resources before returning them from ``pop``. This
+can be configured using the ``check`` argument::
+
+   >>> pool = ResourcePool(alloc=R, check=lambda resource: resource.alive)
+   >>> with pool() as obj:
+   >>>     obj.use()
+
+The object given in ``check`` must be a callable that takes a resource instance and returns a truthy
+value. It will be called for a result value candidate of ``pop``before it is returned, and if the
+result is convertible to ``False``, then the resource is considered dead and will be discarded
+without calling any ``dealloc``procedure. ``pop``will then continue trying to get a valid resource.
+
+
+Future extension plans
+======================
+
+These is a list of tentatively planned extensions for future releases:
+
+   Maximum retention time:
+      An additional argument ``maxage`` can be used the maximum time a resource shall be kept in the
+      pool. The ``minsize`` argument can be used to guarantee a minimal set of pooled resources,
+      regardless of age.
+      
+
+Shooting yourself in the foot
+=============================
+
+It is possible to block a thread indefinitely by having an empty fixed-size pool and using a timeout of 0::
+
+   >>> resources = [R()]
+   >>> pool = ResourcePool()  # an empty list is actually the default for init
+   >>> def add(pool):
+   >>>     pool.push(R())
+   >>> threading.Timer(60, add, pool).start()
+   >>> with pool(timeout=10) as obj:
+   >>>     obj.use()
+   
+   This code would block forever without the ``Timer`` thread that adds a new object to the pool after 60 seconds.
