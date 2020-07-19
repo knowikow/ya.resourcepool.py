@@ -97,7 +97,6 @@ if there is no free resource available at the moment::
 
 Alternatively, a timeout in seconds can be given::
 
-   >>> resources = [R()]
    >>> pool = ResourcePool()  # an empty list is actually the default for init
    >>> with pool(timeout=5) as obj:
    ...     obj.use()
@@ -187,8 +186,7 @@ Shooting yourself in the foot
 
 It is possible to block a thread indefinitely by having an empty fixed-size pool and using a timeout of 0::
 
-   >>> resources = [R()]
-   >>> pool = ResourcePool()  # an empty list is actually the default for init
+   >>> pool = ResourcePool()
    >>>
    >>> def allocate(pool):
    ...     pool.push(R())
