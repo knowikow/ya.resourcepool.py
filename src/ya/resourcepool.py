@@ -17,20 +17,26 @@ R = TypeVar('R')  # pragma: no mutate
 
 class ResourcePool(Generic[R]):
     """The resource pool."""
-    __slots__ = ('__pool', '__alloc', '__check', '__dealloc', '__lock',
-                 '__cond', '__gc_cond', '__min', '__max', '__age')
+    __slots__ = (
+        '__pool',
+        '__alloc',
+        '__check',
+        '__dealloc',
+        '__lock',
+        '__cond',
+        '__gc_cond',
+        '__min',
+        '__max',
+    )
 
-    def __init__(
-        self: ResourcePool,
-        *,
-        alloc: Callable[[], R] = None,
-        dealloc: Callable[[R], Any] = None,
-        check: Callable[[R], bool] = None,
-        init: Iterable = [],
-        minsize: Optional[int] = None,
-        maxsize: Optional[int] = None,
-        maxage: Optional[int] = None,
-    ) -> None:
+    def __init__(self: ResourcePool,
+                 *,
+                 alloc: Callable[[], R] = None,
+                 dealloc: Callable[[R], Any] = None,
+                 check: Callable[[R], bool] = None,
+                 init: Iterable = [],
+                 minsize: Optional[int] = None,
+                 maxsize: Optional[int] = None) -> None:
         """Initialize the object."""
         self.__lock = threading.Lock()
         self.__cond = threading.Condition(self.__lock)
@@ -46,13 +52,13 @@ class ResourcePool(Generic[R]):
             ResourceWrapper(resource, self.__dealloc, self.__check)
             for resource in init)
 
+        self.__max = maxsize
         if minsize is None:
             minsize = maxsize
         self.__min = minsize
-        self.__max = maxsize
-        self.__age = maxage
 
-        threading.Thread(target=self.__gc, daemon=True).start()
+        if self.__max is not None:
+            threading.Thread(target=self.__gc, daemon=True).start()
 
     def pop(self: ResourcePool, timeout: float = None) -> R:
         """Get a resource from the pool.
@@ -115,13 +121,13 @@ class ResourcePool(Generic[R]):
         def _max_size_exceeded() -> bool:
             return len(self.__pool) > self.__max
 
-        while self.__max is not None:
+        while True:
             with self.__gc_cond:
                 self.__gc_cond.wait_for(_max_size_exceeded)
-
-                with suppress(IndexError):
-                    while len(self.__pool) > self.__min:
-                        self.__pool.pop().finalize()
+                if self.__max is not None:
+                    with suppress(IndexError):
+                        while len(self.__pool) > self.__min:
+                            self.__pool.pop().finalize()
 
 
 class ResourceWrapper(Generic[R]):
