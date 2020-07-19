@@ -35,4 +35,4 @@ jobs:
         pip install -e .[testing]
     - name: Test with pytest
       run: |
-        pytest
+        pytest --doctest-glob='*.rst'

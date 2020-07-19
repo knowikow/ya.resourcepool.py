@@ -12,29 +12,29 @@ All the code examples assume::
 
    >>> from ya.resourcepool import *
    >>> import threading
-   >>> 
+   >>>
    >>> class R(int):
-   >>>     lock = threading.Lock()
-   >>>     current = 0  # last generated number
-   >>>     deallocated = []
-   >>> 
-   >>>     def __new__(cls, *args, **kwds):
-   >>>         with R.lock:
-   >>>             R.current += 1
-   >>>             instance = super().__new__(cls, R.current)
-   >>>         return instance
-   >>> 
-   >>>     def __init__(self: R) -> None:
-   >>>         self.alive = True
-   >>> 
-   >>>     def close(self: R) -> None:
-   >>>         self.alive = False
-   >>>         R.deallocated.append(self)
-   >>>         return self
-   >>> 
-   >>>     def use(self):
-   >>>         print(f'Using resource {self}')
-   >>>         return self
+   ...     lock = threading.Lock()
+   ...     current = 0  # last generated number
+   ...     deallocated = []
+   ...
+   ...     def __new__(cls, *args, **kwds):
+   ...         with R.lock:
+   ...             R.current += 1
+   ...             instance = super().__new__(cls, R.current)
+   ...         return instance
+   ...
+   ...     def __init__(self):
+   ...         self.alive = True
+   ...
+   ...     def close(self):
+   ...         self.alive = False
+   ...         R.deallocated.append(self)
+   ...         return self
+   ...
+   ...     def use(self):
+   ...         print(f'Using resource {self}')
+   ...         return self
 
 
 Usage examples
@@ -45,7 +45,8 @@ The most basic example only configures the method of allocation of the resource 
 
    >>> pool = ResourcePool(alloc=R)
    >>> with pool() as obj:
-   >>>     obj.use()
+   ...     obj.use()
+   Using resource ...
 
 This assumes that the resource can be simply garbage collected, and that an unlimited
 amount can be allocated.
@@ -56,6 +57,7 @@ the methods ``ResourcePool.pop()`` and ``ResourcePool.push()`` can be used::
    >>> pool = ResourcePool(alloc=R)
    >>> obj = pool.pop()
    >>> obj.use()
+   Using resource ...
    >>> pool.push(obj)
 
 Note that ``ResourcePool.pop()`` transfers ownership of the resource to the client code, and it is the client's
@@ -78,7 +80,8 @@ If there is only a limited amount of resource instances available, a set can be 
    >>> resources = [R()]
    >>> pool = ResourcePool(init=resources)
    >>> with pool() as obj:
-   >>>     obj.use()
+   ...     obj.use()
+   Using resource ...
 
 In that case, no new resources will be allocated, and only the ones given in the initializer will be used.
 
@@ -87,7 +90,7 @@ if there is no free resource available at the moment::
 
    >>> pool = ResourcePool(init=[])  # note the empty list
    >>> with pool() as obj:
-   >>>     obj.use()
+   ...     obj.use()
    Traceback (most recent call last):
       ...
    ya.resourcepool.ResourcePoolEmpty
@@ -96,13 +99,13 @@ Alternatively, a timeout in seconds can be given::
 
    >>> resources = [R()]
    >>> pool = ResourcePool()  # an empty list is actually the default for init
-   >>> with pool(timeout=10) as obj:
-   >>>     obj.use()
+   >>> with pool(timeout=5) as obj:
+   ...     obj.use()
    Traceback (most recent call last):
       ...
    ya.resourcepool.ResourcePoolEmpty
 
-This will raise the exception only after the given timeout of ten seconds. Note that the timeout is a
+This will raise the exception only after the given timeout of five seconds. Note that the timeout is a
 floating point number, so fractions of seconds are possible. A timeout of zero or less will block forever
 or until a resource becomes available.
 
@@ -111,7 +114,8 @@ The `ìnit``argument can be combined with the ``alloc`` argument::
    >>> resources = [R()]
    >>> pool = ResourcePool(init=resources, alloc=R)
    >>> with pool() as obj:
-   >>>     obj.use()
+   ...     obj.use()
+   Using resource ...
 
 This will use the initial resource list and only allocate new ones if the initial resources are exhausted.
 
@@ -124,7 +128,8 @@ given with the ``dealloc`` initializer argument::
 
    >>> pool = ResourcePool(alloc=R, dealloc=R.close)
    >>> with pool() as obj:
-   >>>     obj.use()
+   ...     obj.use()
+   Using resource ...
 
 This will call ``R.close()`` when the pool gets garbage collected for all resources currently managed by the pool.
 
@@ -157,7 +162,8 @@ can be configured using the ``check`` argument::
 
    >>> pool = ResourcePool(alloc=R, check=lambda resource: resource.alive)
    >>> with pool() as obj:
-   >>>     obj.use()
+   ...     obj.use()
+   Using resource ...
 
 The object given in ``check`` must be a callable that takes a resource instance and returns a truthy
 value. It will be called for a result value candidate of ``pop`` before it is returned, and if the
@@ -174,7 +180,7 @@ These is a list of tentatively planned extensions for future releases:
       An additional argument ``maxage`` can be used the maximum time a resource shall be kept in the
       pool. The ``minsize`` argument can be used to guarantee a minimal set of pooled resources,
       regardless of age.
-      
+
 
 Shooting yourself in the foot
 =============================
@@ -183,10 +189,14 @@ It is possible to block a thread indefinitely by having an empty fixed-size pool
 
    >>> resources = [R()]
    >>> pool = ResourcePool()  # an empty list is actually the default for init
-   >>> def add(pool):
-   >>>     pool.push(R())
-   >>> threading.Timer(60, add, pool).start()
-   >>> with pool(timeout=10) as obj:
-   >>>     obj.use()
-   
-This code would block forever without the ``Timer`` thread that adds a new object to the pool after 60 seconds.
+   >>>
+   >>> def allocate(pool):
+   ...     pool.push(R())
+   >>>
+   >>> threading.Timer(5, allocate, (pool,)).start()
+   >>>
+   >>> with pool(timeout=0) as obj:
+   ...     obj.use()
+   Using resource ...
+
+This code would block forever without the ``Timer`` thread that adds a new object to the pool after 5 seconds.
