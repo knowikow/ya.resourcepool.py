@@ -256,7 +256,7 @@ def test_init() -> None:
 
     for x in range(100):
         with pool() as r:
-            assert r == x % 10
+            assert r == 0
 
 
 def test_call_allocator() -> None:
@@ -314,7 +314,7 @@ def test_reuse() -> None:
             resources.append(r)
 
     allocate.assert_called_once()
-    assert resources == [1] * 4 + [100] * 2
+    assert resources == [1, 1, 1, 100, 1, 1]
 
 
 def test_max_size() -> None:

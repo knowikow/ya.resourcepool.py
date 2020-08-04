@@ -75,13 +75,13 @@ class ResourcePool(Generic[R]):
                 return self.__alloc(timeout)
             else:
                 with suppress(DeadResource):
-                    return wrapper.pop()
+                    return wrapper.detach()
 
     def push(self: ResourcePool, resource: R) -> None:
         """Return a resource into the pool."""
         wrapper = ResourceWrapper(resource, self.__dealloc, self.__check)
         with self.__cond:
-            self.__pool.appendleft(wrapper)
+            self.__pool.append(wrapper)
             self.__cond.notify()
         with self.__gc_cond:
             self.__gc_cond.notify()
@@ -112,7 +112,7 @@ class ResourcePool(Generic[R]):
 
                 wrapper = self.__pool.pop()
                 try:
-                    obj = wrapper.pop()
+                    obj = wrapper.detach()
                     return obj
                 except DeadResource:
                     timeout -= (now() - start)
@@ -124,10 +124,9 @@ class ResourcePool(Generic[R]):
         while True:
             with self.__gc_cond:
                 self.__gc_cond.wait_for(_max_size_exceeded)
-                if self.__max is not None:
-                    with suppress(IndexError):
-                        while len(self.__pool) > self.__min:
-                            self.__pool.pop().finalize()
+                with suppress(IndexError):
+                    while len(self.__pool) > self.__min:
+                        self.__pool.popleft().finalize()
 
 
 class ResourceWrapper(Generic[R]):
@@ -141,7 +140,7 @@ class ResourceWrapper(Generic[R]):
         self.finalize = finalize(self, dealloc, resource)
         self.check = check
 
-    def pop(self: ResourceWrapper) -> R:
+    def detach(self: ResourceWrapper) -> R:
         """Detach and return the wrapped resource."""
         try:
             _, _, args, _ = self.finalize.detach()
