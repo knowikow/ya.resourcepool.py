@@ -34,7 +34,7 @@ class ResourcePool(Generic[R]):
                  alloc: Callable[[], R] = None,
                  dealloc: Callable[[R], Any] = None,
                  check: Callable[[R], bool] = None,
-                 init: Iterable = [],
+                 init: Optional[Iterable] = None,
                  minsize: Optional[int] = None,
                  maxsize: Optional[int] = None,
                  maxage: Optional[float] = None) -> None:
@@ -48,6 +48,13 @@ class ResourcePool(Generic[R]):
             self.__alloc = lambda _: alloc()
         self.__check = check or true
         self.__dealloc = dealloc or noop
+
+        if not init:
+            init = []
+
+        if alloc and minsize:
+            while len(init) < minsize:
+                init.append(alloc())
         self.__pool.extendleft(
             finalize(self.__pool, self.__dealloc, resource)
             for resource in init)

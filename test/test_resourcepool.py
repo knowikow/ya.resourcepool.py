@@ -131,6 +131,21 @@ def test_no_resources_eternal_timeout() -> None:
     assert duration == pytest.approx(timeout, abs=1e-2)
 
 
+def test_init() -> None:
+    pool = ResourcePool(init=[1, 2, 3])
+    assert len(pool) == 3
+
+
+def test_minsize() -> None:
+    pool = ResourcePool(alloc=R, minsize=3)
+    assert len(pool) == 3
+
+
+def test_minsize_init() -> None:
+    pool = ResourcePool(init=[1, 2, 3], alloc=R, minsize=6)
+    assert len(pool) == 6
+
+
 def test_limited_resources_with_timeout() -> None:
     """Test mltiple threads trying to allocate from a limited resource pool.
 
