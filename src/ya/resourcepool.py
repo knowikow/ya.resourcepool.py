@@ -24,9 +24,9 @@ class ResourcePool(Generic[R]):
         '__dealloc',
         '__lock',
         '__cond',
-        '__gc_cond',
         '__min',
         '__max',
+        '__maxage',
     )
 
     def __init__(self: ResourcePool,
@@ -36,11 +36,11 @@ class ResourcePool(Generic[R]):
                  check: Callable[[R], bool] = None,
                  init: Iterable = [],
                  minsize: Optional[int] = None,
-                 maxsize: Optional[int] = None) -> None:
+                 maxsize: Optional[int] = None,
+                 maxage: Optional[float] = None) -> None:
         """Initialize the object."""
         self.__lock = threading.Lock()
         self.__cond = threading.Condition(self.__lock)
-        self.__gc_cond = threading.Condition(self.__lock)
         self.__pool = deque()
         if alloc is None:
             self.__alloc = self.__wait_blocking
@@ -49,9 +49,10 @@ class ResourcePool(Generic[R]):
         self.__check = check or true
         self.__dealloc = dealloc or noop
         self.__pool.extendleft(
-            ResourceWrapper(resource, self.__dealloc, self.__check)
+            finalize(self.__pool, self.__dealloc, resource)
             for resource in init)
 
+        self.__maxage = maxage
         self.__max = maxsize
         if minsize is None:
             minsize = maxsize
@@ -75,16 +76,17 @@ class ResourcePool(Generic[R]):
                 return self.__alloc(timeout)
             else:
                 with suppress(DeadResource):
-                    return wrapper.detach()
+                    return self.__detach(wrapper)
 
     def push(self: ResourcePool, resource: R) -> None:
         """Return a resource into the pool."""
-        wrapper = ResourceWrapper(resource, self.__dealloc, self.__check)
+        wrapper = finalize(self.__pool, self.__dealloc, resource)
         with self.__cond:
             self.__pool.append(wrapper)
-            self.__cond.notify()
-        with self.__gc_cond:
-            self.__gc_cond.notify()
+            if self.__maxage:
+                threading.Timer(self.__maxage, self.__drop,
+                                (wrapper, )).start()
+            self.__cond.notify_all()
 
     @contextmanager
     def __call__(self: ResourcePool, timeout: float = None) -> Generator:
@@ -95,63 +97,63 @@ class ResourcePool(Generic[R]):
         finally:
             self.push(resource)
 
+    def __len__(self: ResourcePool) -> int:
+        """Get the number of currently pooled resources."""
+        return len(self.__pool)
+
     def __wait_blocking(self: ResourcePool, timeout: Optional[float]) -> R:
         def _nonempty() -> bool:
             return len(self.__pool) > 0
 
         if timeout is None:
             raise ResourcePoolEmpty
-        elif timeout <= 0:
-            timeout = None
+        else:
+            timeoutend = now() + timeout
 
         while True:
-            start = now()
+            timeout = timeoutend - now()
+            if timeout <= 0:
+                timeout = None
+
             with self.__cond:
                 if not self.__cond.wait_for(_nonempty, timeout=timeout):
                     raise ResourcePoolEmpty
 
                 wrapper = self.__pool.pop()
-                try:
-                    obj = wrapper.detach()
+                with suppress(DeadResource):
+                    obj = self.__detach(wrapper)
                     return obj
-                except DeadResource:
-                    timeout -= (now() - start)
 
     def __gc(self: ResourcePool) -> None:
         def _max_size_exceeded() -> bool:
             return len(self.__pool) > self.__max
 
         while True:
-            with self.__gc_cond:
-                self.__gc_cond.wait_for(_max_size_exceeded)
-                with suppress(IndexError):
-                    while len(self.__pool) > self.__min:
-                        self.__pool.popleft().finalize()
+            with self.__cond:
+                self.__cond.wait_for(_max_size_exceeded)
+                while len(self.__pool) > self.__min:
+                    wrapper = self.__pool.popleft()
+                    wrapper()
 
-
-class ResourceWrapper(Generic[R]):
-    """A wrapper for a resource that is managed by the ResourceWrapper."""
-    __slots__ = 'check finalize __weakref__'.split()
-
-    def __init__(self: ResourceWrapper, resource: R,
-                 dealloc: Callable[[R], Any], check: Callable[[R],
-                                                              bool]) -> None:
-        """Initialize the object."""
-        self.finalize = finalize(self, dealloc, resource)
-        self.check = check
-
-    def detach(self: ResourceWrapper) -> R:
+    def __detach(self: ResourcePool, wrapper: finalize) -> R:
         """Detach and return the wrapped resource."""
         try:
-            _, _, args, _ = self.finalize.detach()
+            _, _, args, _ = wrapper.detach()
         except TypeError as ex:
             raise DeadResource from ex
         else:
             resource = args[0]
-            if not self.check(resource):
+            if not self.__check(resource):
                 raise DeadResource
 
             return resource
+
+    def __drop(self: ResourcePool, wrapper: finalize) -> None:
+        """Remove and dstroy the given object."""
+        with suppress(ValueError), self.__lock:
+            if self.__min is None or len(self) > self.__min:
+                self.__pool.remove(wrapper)
+                wrapper()
 
 
 class DeadResource(Exception):

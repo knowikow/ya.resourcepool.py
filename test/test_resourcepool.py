@@ -389,4 +389,38 @@ def test_minmax_size() -> None:
     assert c.alive
 
 
+def test_maxage() -> None:
+    """Test maxage parameter."""
+    size = 5
+    pool = ResourcePool(alloc=now, maxage=1)
+
+    resources = [pool.pop() for _ in range(size)]
+    for r in resources:
+        pool.push(r)
+
+    assert len(pool) == size
+    sleep(1.1)
+    assert len(pool) == 0
+
+
+def test_maxage_minsize() -> None:
+    """Test maxage parameter with minimum size."""
+    size = 5
+    pool = ResourcePool(alloc=now, maxage=1, minsize=1)
+
+    resources = [pool.pop() for _ in range(size)]
+    assert len(pool) == 0
+
+    for r in resources:
+        sleep(0.1)
+        pool.push(r)
+
+    assert len(pool) == size
+    sleep(2)
+    assert len(pool) == 1
+    expected = max(resources)
+    actual = pool.pop()
+    assert actual == expected
+
+
 # vim:et sw=4 ts=4
