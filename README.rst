@@ -152,6 +152,10 @@ in the overflow case::
 This will reduce the pool size to 50 by deallocating surplus resources when the size exceeds 100 after
 a ``push`` operation.
 
+An additional argument ``maxage`` can be used to set the maximum time a resource shall be kept in the
+pool. The ``minsize`` argument can be used to guarantee a minimal set of pooled resources,
+regardless of age.
+
 
 Resource alive check
 --------------------
