@@ -174,17 +174,6 @@ result is convertible to ``False``, then the resource is considered dead and wil
 without calling any ``dealloc`` procedure. ``pop`` will then continue trying to get a valid resource.
 
 
-Future extension plans
-======================
-
-These is a list of tentatively planned extensions for future releases:
-
-   Maximum retention time:
-      An additional argument ``maxage`` can be used the maximum time a resource shall be kept in the
-      pool. The ``minsize`` argument can be used to guarantee a minimal set of pooled resources,
-      regardless of age.
-
-
 Shooting yourself in the foot
 =============================
 
