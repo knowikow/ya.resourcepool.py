@@ -75,7 +75,7 @@ The ``ResourcePool.__call__()`` method is actually implemented in terms of ``pop
 Limited resource sets
 ---------------------
 
-If there is only a limited amount of resource instances available, a set can be provided with the ``init``argument::
+If there is only a limited amount of resource instances available, a set can be provided with the ``init`` argument::
 
    >>> resources = [R()]
    >>> pool = ResourcePool(init=resources)
