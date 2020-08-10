@@ -68,7 +68,7 @@ class ResourcePool(Generic[R]):
         if self.__max is not None:
             threading.Thread(target=self.__gc, daemon=True).start()
 
-    def pop(self: ResourcePool, timeout: float = None) -> R:
+    def pop(self: ResourcePool, timeout: Optional[float] = None) -> R:
         """Get a resource from the pool.
 
         The returned resource will no longer be under the control of the pool. It is the
