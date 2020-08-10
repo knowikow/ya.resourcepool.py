@@ -114,13 +114,15 @@ class ResourcePool(Generic[R]):
 
         if timeout is None:
             raise ResourcePoolEmpty
+        elif timeout <= 0:
+            timeoutend = None
+            timeout = None
         else:
             timeoutend = now() + timeout
 
         while True:
-            timeout = timeoutend - now()
-            if timeout <= 0:
-                timeout = None
+            with suppress(TypeError):
+                timeout = timeoutend - now()
 
             with self.__cond:
                 if not self.__cond.wait_for(_nonempty, timeout=timeout):
